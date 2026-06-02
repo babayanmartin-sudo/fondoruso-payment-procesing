@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Local overrides with real secrets — never commit these
+*.local.json
+secrets.json

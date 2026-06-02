@@ -1,0 +1,202 @@
+{
+  "name": "Fondo Ruso: Payment Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "YOUR_WEBHOOK_PATH",
+        "authentication": "basicAuth",
+        "options": {}
+      },
+      "id": "e4c8b21a-53f4-4747-aed7-06063a84794e",
+      "name": "New Payment Submission",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1024, 128],
+      "webhookId": "payment-nocodb-webhook",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "VPS Login"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.item.json;\n\nlet raw;\nif (payload.data?.rows?.[0]) {\n  raw = payload.data.rows[0];\n} else if (payload.body?.data?.rows?.[0]) {\n  raw = payload.body.data.rows[0];\n} else if (payload.body) {\n  raw = payload.body;\n} else {\n  raw = payload;\n}\n\nconst memberName = raw.Name;\nconst paymentType = raw.Payment;\n\nlet newDueDate = null;\nif (paymentType === 'Полгода (1800 или 2500)') {\n  newDueDate = '2027-01-31';\n} else if (paymentType === 'Год (3600 или 5000)') {\n  newDueDate = '2027-07-31';\n}\n\nreturn [{\n  json: {\n    memberName,\n    paymentType,\n    newDueDate,\n    isValid: newDueDate !== null\n  }\n}];\n"
+      },
+      "id": "b126e0a9-3861-47a8-a84e-08c01bb89a32",
+      "name": "Extract Submission Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-800, 128]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": false
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "87ca0cb0-961a-495d-b94b-c1fb2b67c404",
+      "name": "Valid Payment?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-576, 128]
+    },
+    {
+      "parameters": {
+        "url": "=https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_TABLE_ID?where=(Name,eq,{{ encodeURIComponent($json.memberName) }})",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "YOUR_NOCODB_API_TOKEN"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0f4e5ea9-e3b8-48a7-a883-99e6046af9ae",
+      "name": "Find Member",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-352, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_TABLE_ID/{{ $json.list[0].Id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "YOUR_NOCODB_API_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ 'Взнос': $('Extract Submission Info').item.json.newDueDate }) }}",
+        "options": {}
+      },
+      "id": "247001e8-eb85-4040-90d8-b4f16694804b",
+      "name": "Update Due Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-128, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@fondoruso.ru",
+        "toEmail": "YOUR_ALERT_EMAIL",
+        "subject": "Payment not recognized — manual review needed",
+        "html": "=Payment from {{ $json.memberName }} could not be matched. Payment type received: {{ $json.paymentType }}. Please review manually.",
+        "options": {}
+      },
+      "id": "279b0b86-5151-4994-98fe-5086b974a362",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [-352, 272],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP - Fondo Ruso"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Payment Submission": {
+      "main": [
+        [
+          {
+            "node": "Extract Submission Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Submission Info": {
+      "main": [
+        [
+          {
+            "node": "Valid Payment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Payment?": {
+      "main": [
+        [
+          {
+            "node": "Find Member",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Member": {
+      "main": [
+        [
+          {
+            "node": "Update Due Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "AfYaFFCA0fgWpNUF",
+  "tags": [
+    {
+      "name": "fondo ruso"
+    }
+  ]
+}
