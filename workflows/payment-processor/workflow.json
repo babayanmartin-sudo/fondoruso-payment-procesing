@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $input.item.json;\n\nlet raw;\nif (payload.data?.rows?.[0]) {\n  raw = payload.data.rows[0];\n} else if (payload.body?.data?.rows?.[0]) {\n  raw = payload.body.data.rows[0];\n} else if (payload.body) {\n  raw = payload.body;\n} else {\n  raw = payload;\n}\n\nconst memberName = raw.Name;\nconst paymentType = raw.Payment;\n\nlet newDueDate = null;\nif (paymentType === 'Полгода (1800 или 2500)') {\n  newDueDate = '2027-01-31';\n} else if (paymentType === 'Год (3600 или 5000)') {\n  newDueDate = '2027-07-31';\n}\n\nreturn [{\n  json: {\n    memberName,\n    paymentType,\n    newDueDate,\n    isValid: newDueDate !== null\n  }\n}];\n"
+        "jsCode": "const payload = $input.item.json;\n\nlet raw;\nif (payload.data?.rows?.[0]) {\n  raw = payload.data.rows[0];\n} else if (payload.body?.data?.rows?.[0]) {\n  raw = payload.body.data.rows[0];\n} else if (payload.body) {\n  raw = payload.body;\n} else {\n  raw = payload;\n}\n\nconst memberName = raw.Name;\nconst paymentType = raw.Payment;\n\nlet newDueDate = null;\nif (paymentType === 'Полгода 1800' || paymentType === 'Полгода 2500') {\n  newDueDate = '2027-01-31';\n} else if (paymentType === 'Год 3600' || paymentType === 'Год 5000') {\n  newDueDate = '2027-07-31';\n}\n\nreturn [{\n  json: {\n    memberName,\n    paymentType,\n    newDueDate,\n    isValid: newDueDate !== null\n  }\n}];\n"
       },
       "id": "b126e0a9-3861-47a8-a84e-08c01bb89a32",
       "name": "Extract Submission Info",
