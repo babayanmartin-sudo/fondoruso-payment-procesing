@@ -14,10 +14,20 @@ This repository contains n8n workflow definitions for the **Fondo Ruso** members
 
 ```
 workflows/
-└── payment-processor/
+├── payment-processor/
+│   ├── workflow.json   — importable n8n workflow
+│   └── README.md       — setup & configuration guide
+└── payments-summary/
     ├── workflow.json   — importable n8n workflow
     └── README.md       — setup & configuration guide
 ```
+
+## Workflows
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| [payment-processor](workflows/payment-processor/) | NocoDB webhook (new payment record) | Validates payment type and updates member due date |
+| [payments-summary](workflows/payments-summary/) | Weekly schedule (Monday 9:00) | Exports unprocessed payments as CSV and emails for import |
 
 ## How to import a workflow
 
