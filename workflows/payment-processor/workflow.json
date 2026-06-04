@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $input.item.json;\n\nlet raw;\nif (payload.data?.rows?.[0]) {\n  raw = payload.data.rows[0];\n} else if (payload.body?.data?.rows?.[0]) {\n  raw = payload.body.data.rows[0];\n} else if (payload.body) {\n  raw = payload.body;\n} else {\n  raw = payload;\n}\n\nconst memberName = raw.Name;\nconst paymentType = raw.Payment;\n\nlet newDueDate = null;\nif (paymentType === 'ÐÐ¾Ð»Ð³Ð¾Ð´Ð° 1800' || paymentType === 'ÐÐ¾Ð»Ð³Ð¾Ð´Ð° 2500') {\n  newDueDate = '2027-01-31';\n} else if (paymentType === 'ÐÐ¾Ð´ 3600' || paymentType === 'ÐÐ¾Ð´ 5000') {\n  newDueDate = '2027-07-31';\n}\n\nreturn [{\n  json: {\n    memberName,\n    paymentType,\n    newDueDate,\n    isValid: newDueDate !== null\n  }\n}];\n"
+        "jsCode": "const payload = $input.item.json;\n\nlet raw;\nif (payload.data?.rows?.[0]) {\n  raw = payload.data.rows[0];\n} else if (payload.body?.data?.rows?.[0]) {\n  raw = payload.body.data.rows[0];\n} else if (payload.body) {\n  raw = payload.body;\n} else {\n  raw = payload;\n}\n\nconst memberName = raw.Name;\nconst paymentType = raw.Payment;\n\nlet newDueDate = null;\nif (paymentType === 'Полгода 1800' || paymentType === 'Полгода 2500') {\n  newDueDate = '2027-01-31';\n} else if (paymentType === 'Год 3600' || paymentType === 'Год 5000') {\n  newDueDate = '2027-07-31';\n}\n\nreturn [{\n  json: {\n    memberName,\n    paymentType,\n    newDueDate,\n    isValid: newDueDate !== null\n  }\n}];\n"
       },
       "id": "ed521d22-d3c8-477a-89f9-df0472a3b70f",
       "name": "Extract Submission Info",
@@ -64,33 +64,13 @@
     },
     {
       "parameters": {
-        "url": "=https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_MEMBERS_TABLE_ID?where=(Name,eq,{{ encodeURIComponent($json.memberName) }})",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "xc-token",
-              "value": "YOUR_NOCODB_API_TOKEN"
-            }
-          ]
-        },
-        "options": {}
+        "jsCode": "const memberName = $input.item.json.memberName;\nconst newDueDate = $input.item.json.newDueDate;\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: 'https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_MEMBERS_TABLE_ID',\n  qs: { where: `(Name,eq,${memberName})` },\n  headers: { 'xc-token': 'YOUR_NOCODB_API_TOKEN' }\n});\n\nconst member = response.list[0];\nconst payload = { 'Взнос': newDueDate };\n\nconst status = Array.isArray(member['Статус']) ? member['Статус'][0] : member['Статус'];\nif (status === 'Заявка') {\n  payload['Статус'] = 'FR';\n  payload['Дата вступления'] = '2026-08-01';\n}\n\nreturn [{ json: { memberId: member.Id, payload } }];"
       },
       "id": "3e6c15e5-15b4-487e-bd11-dc293da5a846",
-      "name": "Find Member",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [-336, 672]
-    },
-    {
-      "parameters": {
-        "jsCode": "const member = $input.item.json.list[0];\nconst newDueDate = $('Extract Submission Info').item.json.newDueDate;\n\nconst payload = { 'Взнос': newDueDate };\n\nif (member['Статус'] === 'Заявка') {\n  payload['Статус'] = 'FR';\n  payload['Дата вступления'] = '2026-08-01';\n}\n\nreturn [{ json: { memberId: member.Id, payload } }];"
-      },
-      "id": "c1d2e3f4-a5b6-7890-cdef-123456789abc",
-      "name": "Build Update Payload",
+      "name": "Find Member & Build Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-176, 672]
+      "position": [-336, 672]
     },
     {
       "parameters": {
@@ -125,8 +105,8 @@
       "parameters": {
         "fromEmail": "noreply@fondoruso.ru",
         "toEmail": "YOUR_ALERT_EMAIL",
-        "subject": "Payment not recognized Ã¢ manual review needed",
-        "html": "=Ð£  {{ $json.memberName }} Ð¿ÑÐ¾Ð±Ð»ÐµÐ¼Ð° Ñ Ð¾Ð¿Ð»Ð°ÑÐ¾Ð¹. ÐÐ°Ð´Ð¾ Ð¿ÑÐ¾Ð²ÐµÑÐ¸ÑÑ.",
+        "subject": "Payment not recognized — manual review needed",
+        "html": "=Payment from {{ $json.memberName }} could not be matched. Payment type received: {{ $json.paymentType }}. Please review manually.",
         "options": {}
       },
       "id": "20ed295d-f277-408b-9306-07d6fceb09be",
@@ -171,7 +151,7 @@
       "main": [
         [
           {
-            "node": "Find Member",
+            "node": "Find Member & Build Payload",
             "type": "main",
             "index": 0
           }
@@ -185,18 +165,7 @@
         ]
       ]
     },
-    "Find Member": {
-      "main": [
-        [
-          {
-            "node": "Build Update Payload",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Update Payload": {
+    "Find Member & Build Payload": {
       "main": [
         [
           {
@@ -213,7 +182,6 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "b708b41b-3af6-45f3-94e5-df251ba8da7f",
   "meta": {
     "templateCredsSetupCompleted": true
   },
