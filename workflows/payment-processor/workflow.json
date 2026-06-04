@@ -84,8 +84,18 @@
     },
     {
       "parameters": {
+        "jsCode": "const member = $input.item.json.list[0];\nconst newDueDate = $('Extract Submission Info').item.json.newDueDate;\n\nconst payload = { 'Взнос': newDueDate };\n\nif (member['Статус'] === 'Заявка') {\n  payload['Статус'] = 'FR';\n  payload['Дата вступления'] = '2026-08-01';\n}\n\nreturn [{ json: { memberId: member.Id, payload } }];"
+      },
+      "id": "c1d2e3f4-a5b6-7890-cdef-123456789abc",
+      "name": "Build Update Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-176, 672]
+    },
+    {
+      "parameters": {
         "method": "PATCH",
-        "url": "=https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_MEMBERS_TABLE_ID/{{ $json.list[0].Id }}",
+        "url": "=https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_MEMBERS_TABLE_ID/{{ $json.memberId }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -102,14 +112,14 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ 'ÐÐ·Ð½Ð¾Ñ': $('Extract Submission Info').item.json.newDueDate }) }}",
+        "body": "={{ JSON.stringify($json.payload) }}",
         "options": {}
       },
       "id": "0986413b-79f0-43cc-9708-e67aebd9973d",
       "name": "Update Due Date",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-16, 672]
+      "position": [60, 672]
     },
     {
       "parameters": {
@@ -176,6 +186,17 @@
       ]
     },
     "Find Member": {
+      "main": [
+        [
+          {
+            "node": "Build Update Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Update Payload": {
       "main": [
         [
           {
