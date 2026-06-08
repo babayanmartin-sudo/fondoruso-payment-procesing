@@ -7,14 +7,13 @@
           "interval": [
             {
               "field": "weeks",
-              "weeksInterval": 1,
               "triggerAtDay": [1],
               "triggerAtHour": 9
             }
           ]
         }
       },
-      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "id": "3ba84c50-9fef-4878-9706-ac2e53463e85",
       "name": "Weekly Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -22,96 +21,58 @@
     },
     {
       "parameters": {
-        "url": "https://dashboard.fondoruso.ru/api/v1/db/data/noco/YOUR_NOCODB_PROJECT_ID/YOUR_NOCODB_PAYMENTS_TABLE_ID",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "where",
-              "value": "(ck0jfgt6xcunro2,ne,1)~or(ck0jfgt6xcunro2,blank,)"
-            },
-            {
-              "name": "limit",
-              "value": "1000"
-            }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "xc-token",
-              "value": "YOUR_NOCODB_API_TOKEN"
-            }
-          ]
-        },
-        "options": {}
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "workspaceId": "YOUR_NOCODB_WORKSPACE_ID",
+        "projectId": "YOUR_NOCODB_PROJECT_ID",
+        "table": "YOUR_NOCODB_PAYMENTS_TABLE_ID",
+        "options": {
+          "where": "(Send,neq,1)"
+        }
       },
-      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-      "name": "Fetch Unprocessed Payments",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [220, 0]
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [208, 0],
+      "id": "f55be065-4e26-434d-9ecd-73672f4c2daf",
+      "name": "Get many rows",
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "YOUR_NOCODB_CREDENTIAL_ID",
+          "name": "NocoDB Token account"
+        }
+      }
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "has-records",
-              "leftValue": "={{ $json.list.length }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
+        "jsCode": "const rows = $input.all().map(item => item.json);\n\nfunction csvCell(value) {\n  if (value === null || value === undefined || value === '') return '';\n  const str = String(value);\n  if (/[;\\n\\r\"]/.test(str)) {\n    return '\"' + str.replace(/\"/g, '\"\"') + '\"';\n  }\n  return str;\n}\n\nfunction extractSum(field) {\n  if (!field) return null;\n  const match = String(field).match(/\\b(1800|2500|3600|5000)\\b/);\n  return match ? parseInt(match[0]) : null;\n}\n\nconst now = new Date();\nconst pad = n => String(n).padStart(2, '0');\n\nconst currentDate =\n  now.getFullYear() + '-' +\n  pad(now.getMonth() + 1) + '-' +\n  pad(now.getDate()) + ' ' +\n  pad(now.getHours()) + ':' +\n  pad(now.getMinutes()) + ':' +\n  pad(now.getSeconds());\n\nconst formatDate = date =>\n  date.getFullYear() + '-' +\n  pad(date.getMonth() + 1) + '-' +\n  pad(date.getDate());\n\nconst endDate = formatDate(now);\nconst start = new Date(now);\nstart.setDate(start.getDate() - 7);\nconst startDate = formatDate(start);\n\nconst fileName = `fondoruso_payments_${startDate}_to_${endDate}.csv`;\n\nconst recordIds = [];\nconst csvLines = [];\n\nfor (const row of rows) {\n  const sum = extractSum(row['Payment']);\n  if (sum === null) continue;\n\n  const comment = row['Name'] || '';\n  const line = sum + ';;Взносы;;' + currentDate + ';' + csvCell(comment) + ';';\n  csvLines.push(line);\n  recordIds.push(row.Id);\n}\n\nconst csvContent = csvLines.join('\\n');\nconst bom = Buffer.from([0xEF, 0xBB, 0xBF]);\nconst csvBuffer = Buffer.concat([bom, Buffer.from(csvContent, 'utf8')]);\n\nreturn [{\n  json: {\n    recordIds,\n    rowCount: recordIds.length,\n    fileName,\n    periodStart: startDate,\n    periodEnd: endDate\n  },\n  binary: {\n    attachment: {\n      data: csvBuffer.toString('base64'),\n      mimeType: 'text/csv',\n      fileName: fileName,\n      fileExtension: 'csv'\n    }\n  }\n}];"
       },
-      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-      "name": "Has Records?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [440, 0]
-    },
-    {
-      "parameters": {
-        "jsCode": "const rows = $input.all().map(item => item.json);\n\nfunction csvCell(value) {\n  if (value === null || value === undefined || value === '') return '';\n  const str = String(value);\n  if (/[;\\n\\r\"]/.test(str)) {\n    return '\"' + str.replace(/\"/g, '\"\"') + '\"';\n  }\n  return str;\n}\n\nfunction extractSum(field) {\n  if (!field) return null;\n  const match = String(field).match(/\\b(1800|2500|3600|5000)\\b/);\n  return match ? parseInt(match[0]) : null;\n}\n\nconst now = new Date();\nconst pad = n => String(n).padStart(2, '0');\nconst currentDate =\n  now.getFullYear() + '-' +\n  pad(now.getMonth() + 1) + '-' +\n  pad(now.getDate()) + ' ' +\n  pad(now.getHours()) + ':' +\n  pad(now.getMinutes()) + ':' +\n  pad(now.getSeconds());\n\nconst recordIds = [];\nconst csvLines = [];\n\nfor (const row of rows) {\n  const sum = extractSum(row['Payment']);\n  if (sum === null) continue;\n\n  const comment = row['Name'] || '';\n  const line = sum + ';;Взносы;;' + currentDate + ';' + csvCell(comment) + ';';\n  csvLines.push(line);\n  recordIds.push(row.Id);\n}\n\nconst csvContent = csvLines.join('\\n');\nconst bom = Buffer.from([0xEF, 0xBB, 0xBF]);\nconst csvBuffer = Buffer.concat([bom, Buffer.from(csvContent, 'utf8')]);\n\nreturn [{\n  json: {\n    recordIds,\n    rowCount: recordIds.length\n  },\n  binary: {\n    attachment: {\n      data: csvBuffer.toString('base64'),\n      mimeType: 'text/csv',\n      fileName: 'payments_summary.csv',\n      fileExtension: 'csv'\n    }\n  }\n}];"
-      },
-      "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+      "id": "0b5897e3-6bf2-4377-b460-3fd5b66b8e8e",
       "name": "Build CSV",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [464, 0]
     },
     {
       "parameters": {
         "fromEmail": "noreply@fondoruso.ru",
-        "toEmail": "YOUR_ALERT_EMAIL",
-        "subject": "=Fondo Ruso: Payments Summary ({{ $json.rowCount }} записей)",
-        "html": "=Добрый день,<br><br>Во вложении файл выгрузки платежей для импорта.<br><br>Количество записей: {{ $json.rowCount }}<br><br>---<br>Автоматическое письмо",
+        "toEmail": "YOUR_PRIMARY_EMAIL",
+        "subject": "=Fondo Ruso: Платежи за неделю с {{$now.minus({days: 7}).format('yyyy-MM-dd')}} по {{$now.format('yyyy-MM-dd')}} ({{ $json.rowCount }} записей)",
+        "html": "=Шалом, православные <br><br>Во вложении файл выгрузки платежей для импорта за прошедшую неделю с {{$now.minus({days: 7}).format('yyyy-MM-dd')}} по {{$now.format('yyyy-MM-dd')}}.<br><br>Количество записей: {{ $json.rowCount }}<br><br>---<br>Автоматическое письмо",
         "options": {
-          "attachments": "attachment"
+          "appendAttribution": false,
+          "attachments": "attachment",
+          "ccEmail": "YOUR_CC_EMAIL"
         }
       },
-      "id": "e5f6a7b8-c9d0-1234-ef01-345678901234",
+      "id": "f0101541-054b-4e16-b381-b9589451b84e",
       "name": "Send CSV by Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [880, 0],
+      "position": [672, 0],
       "credentials": {
         "smtp": {
           "id": "YOUR_SMTP_CREDENTIAL_ID",
-          "name": "SMTP - Fondo Ruso"
+          "name": "SMTP account"
         }
       }
     },
@@ -119,11 +80,11 @@
       "parameters": {
         "jsCode": "const recordIds = $('Build CSV').first().json.recordIds;\nreturn recordIds.map(id => ({ json: { recordId: id } }));"
       },
-      "id": "f6a7b8c9-d0e1-2345-f012-456789012345",
+      "id": "7c5ccf33-3f3a-41b4-956b-03cb932efd1a",
       "name": "Expand Record IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 0]
+      "position": [896, 0]
     },
     {
       "parameters": {
@@ -145,14 +106,14 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ 'ck0jfgt6xcunro2': 1 }) }}",
+        "body": "={{ JSON.stringify({ 'Send': 1 }) }}",
         "options": {}
       },
-      "id": "a7b8c9d0-e1f2-3456-0123-567890123456",
+      "id": "97d13206-e84e-404d-a9ef-7db2bb968e7a",
       "name": "Mark as Sent",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 0]
+      "position": [1120, 0]
     }
   ],
   "pinData": {},
@@ -161,25 +122,14 @@
       "main": [
         [
           {
-            "node": "Fetch Unprocessed Payments",
+            "node": "Get many rows",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Unprocessed Payments": {
-      "main": [
-        [
-          {
-            "node": "Has Records?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Records?": {
+    "Get many rows": {
       "main": [
         [
           {
@@ -224,9 +174,10 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate"
   },
   "meta": {
     "templateCredsSetupCompleted": true
